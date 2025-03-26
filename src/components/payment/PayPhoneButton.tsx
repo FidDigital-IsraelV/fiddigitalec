@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { PAYPHONE_CONFIG } from '@/config/payment';
 
 interface PayPhoneButtonProps {
   planId: string;
@@ -43,29 +43,39 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
         throw new Error(`Error al registrar la compra: ${purchaseError.message}`);
       }
 
-      // Now, call our edge function to initialize the PayPhone payment
-      const { data, error } = await supabase.functions.invoke('create-payphone-payment', {
-        body: {
-          amount: amount * 100, // Convert to cents as required by PayPhone
-          purchaseId: purchase.id,
-          planTitle,
-          email
-        }
+      // Call PayPhone API directly
+      const response = await fetch(PAYPHONE_CONFIG.API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${PAYPHONE_CONFIG.API_KEY}`
+        },
+        body: JSON.stringify({
+          amount: amount * 100, // Convert to cents
+          clientTransactionId: purchase.id,
+          responseUrl: `${PAYPHONE_CONFIG.CLIENT_URL}/payment-success`,
+          cancellationUrl: `${PAYPHONE_CONFIG.CLIENT_URL}/payment-cancelled`,
+          storeId: PAYPHONE_CONFIG.STORE_ID,
+          reference: `Plan ${planTitle}`,
+          email: email
+        })
       });
 
-      if (error) {
-        throw new Error(`Error al iniciar el pago: ${error.message}`);
+      const paymentData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(`Error de PayPhone: ${paymentData.message || 'Error desconocido'}`);
       }
 
       // Open the PayPhone payment window
-      if (data.paymentUrl) {
-        window.open(data.paymentUrl, '_blank');
+      if (paymentData.paymentUrl) {
+        window.open(paymentData.paymentUrl, '_blank');
         toast.success('Página de pago abierta. Complete su transacción.', {
           description: 'Una vez completada la transacción, será redireccionado de vuelta a nuestro sitio.'
         });
         
-        if (onSuccess && data.transactionId) {
-          onSuccess(data.transactionId);
+        if (onSuccess && paymentData.transactionId) {
+          onSuccess(paymentData.transactionId);
         }
       } else {
         throw new Error('No se pudo obtener el enlace de pago');
