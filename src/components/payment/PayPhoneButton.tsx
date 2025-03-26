@@ -43,28 +43,18 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
         throw new Error(`Error al registrar la compra: ${purchaseError.message}`);
       }
 
-      // Call PayPhone API directly
-      const response = await fetch(PAYPHONE_CONFIG.API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${PAYPHONE_CONFIG.API_KEY}`
-        },
-        body: JSON.stringify({
+      // Call Supabase Edge Function to create payment
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payphone-payment', {
+        body: {
           amount: amount * 100, // Convert to cents
-          clientTransactionId: purchase.id,
-          responseUrl: `${PAYPHONE_CONFIG.CLIENT_URL}/payment-success`,
-          cancellationUrl: `${PAYPHONE_CONFIG.CLIENT_URL}/payment-cancelled`,
-          storeId: PAYPHONE_CONFIG.STORE_ID,
-          reference: `Plan ${planTitle}`,
-          email: email
-        })
+          purchaseId: purchase.id,
+          planTitle,
+          email
+        }
       });
 
-      const paymentData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(`Error de PayPhone: ${paymentData.message || 'Error desconocido'}`);
+      if (paymentError) {
+        throw new Error(`Error al procesar el pago: ${paymentError.message}`);
       }
 
       // Open the PayPhone payment window
