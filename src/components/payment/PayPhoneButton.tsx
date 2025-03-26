@@ -46,13 +46,21 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
           throw new Error(`Error al registrar la compra: ${purchaseError.message}`);
         }
 
+        // Convert amount to cents and calculate tax (12% IVA in Ecuador)
+        const amountInCents = Math.round(amount * 100);
+        const baseAmount = Math.round(amountInCents / 1.15); // Remove tax from total
+        const taxAmount = amountInCents - baseAmount; // Calculate tax amount
+
         // Initialize PayPhone Button Box
         window.ppb = new window.PPaymentButtonBox({
           token: import.meta.env.VITE_PAYPHONE_API_KEY,
           clientTransactionId: purchase.id,
-          amount: Math.round(amount * 100), // Convert to cents and ensure it's an integer
-          amountWithTax: Math.round(amount * 100), // All amount is taxable in this case
-          tax: 0, // Tax is included in the amount
+          amount: amountInCents, // Total amount in cents
+          amountWithTax: baseAmount, // Base amount that will be taxed
+          tax: taxAmount, // Tax amount
+          amountWithoutTax: 0, // No amount without tax in this case
+          service: 0,
+          tip: 0,
           currency: "USD",
           storeId: import.meta.env.VITE_PAYPHONE_STORE_ID,
           reference: `Plan ${planTitle}`,
@@ -71,6 +79,15 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
             }
           }
         });
+
+        // Log the configuration for debugging
+        console.log('PayPhone Configuration:', {
+          amount: amountInCents,
+          amountWithTax: baseAmount,
+          tax: taxAmount,
+          total: baseAmount + taxAmount
+        });
+
       } catch (error) {
         console.error('Error al inicializar PayPhone:', error);
         toast.error('Error al inicializar el pago', {
