@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import React, { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+declare global {
+  interface Window {
+    ppb: any;
+    PPaymentButtonBox: any;
+  }
+}
 
 interface PayPhoneButtonProps {
   planId: string;
@@ -17,87 +23,75 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
   planTitle, 
   amount,
   email,
-  onSuccess,
-  className
+  onSuccess
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
+  const buttonRef = useRef<HTMLDivElement>(null);
 
-  const handlePayment = async () => {
-    try {
-      setIsLoading(true);
-      
-      // First, create a record of the purchase attempt
-      const { data: purchase, error: purchaseError } = await supabase
-        .from('purchases')
-        .insert({
-          plan_id: planId,
-          email,
-          amount,
-          status: 'pending',
-        })
-        .select('id')
-        .single();
-      
-      if (purchaseError) {
-        throw new Error(`Error al registrar la compra: ${purchaseError.message}`);
-      }
+  useEffect(() => {
+    const initializePayPhone = async () => {
+      try {
+        // First, create a record of the purchase attempt
+        const { data: purchase, error: purchaseError } = await supabase
+          .from('purchases')
+          .insert({
+            plan_id: planId,
+            email,
+            amount,
+            status: 'pending',
+          })
+          .select('id')
+          .single();
+        
+        if (purchaseError) {
+          throw new Error(`Error al registrar la compra: ${purchaseError.message}`);
+        }
 
-      // Call PayPhone API directly
-      const response = await fetch(import.meta.env.VITE_PAYPHONE_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_PAYPHONE_API_KEY}`
-        },
-        body: JSON.stringify({
-          amount: amount * 100, // Convert to cents
+        // Initialize PayPhone Button Box
+        window.ppb = new window.PPaymentButtonBox({
+          token: import.meta.env.VITE_PAYPHONE_API_KEY,
           clientTransactionId: purchase.id,
-          responseUrl: `${import.meta.env.VITE_PAYPHONE_CLIENT_URL}/payment-success`,
-          cancellationUrl: `${import.meta.env.VITE_PAYPHONE_CLIENT_URL}/payment-cancelled`,
+          amount: Math.round(amount * 100), // Convert to cents and ensure it's an integer
+          amountWithTax: Math.round(amount * 100), // All amount is taxable in this case
+          tax: 0, // Tax is included in the amount
+          currency: "USD",
           storeId: import.meta.env.VITE_PAYPHONE_STORE_ID,
           reference: `Plan ${planTitle}`,
-          email: email
-        })
-      });
+          email: email,
+          lang: "es",
+          defaultMethod: "card",
+          timeZone: -5
+        }).render('pp-button');
 
-      const paymentData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(`Error de PayPhone: ${paymentData.message || 'Error desconocido'}`);
-      }
-
-      // Open the PayPhone payment window
-      if (paymentData.paymentUrl) {
-        window.open(paymentData.paymentUrl, '_blank');
-        toast.success('Página de pago abierta. Complete su transacción.', {
-          description: 'Una vez completada la transacción, será redireccionado de vuelta a nuestro sitio.'
+        // Listen for payment success
+        window.addEventListener('message', (event) => {
+          if (event.data.type === 'PAYPHONE_PAYMENT_SUCCESS') {
+            toast.success('¡Pago completado con éxito!');
+            if (onSuccess && event.data.transactionId) {
+              onSuccess(event.data.transactionId);
+            }
+          }
         });
-        
-        if (onSuccess && paymentData.transactionId) {
-          onSuccess(paymentData.transactionId);
-        }
-      } else {
-        throw new Error('No se pudo obtener el enlace de pago');
+      } catch (error) {
+        console.error('Error al inicializar PayPhone:', error);
+        toast.error('Error al inicializar el pago', {
+          description: error instanceof Error ? error.message : 'Error desconocido'
+        });
       }
-    } catch (error) {
-      console.error('Error en el proceso de pago:', error);
-      toast.error('Error al procesar el pago', { 
-        description: error.message 
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
 
-  return (
-    <Button 
-      onClick={handlePayment} 
-      disabled={isLoading} 
-      className={className}
-    >
-      {isLoading ? 'Procesando...' : 'Pagar con PayPhone'}
-    </Button>
-  );
+    if (buttonRef.current) {
+      initializePayPhone();
+    }
+
+    return () => {
+      // Cleanup if needed
+      if (window.ppb) {
+        // Add any cleanup code if required by PayPhone
+      }
+    };
+  }, [planId, planTitle, amount, email, onSuccess]);
+
+  return <div id="pp-button" ref={buttonRef} />;
 };
 
 export default PayPhoneButton;
