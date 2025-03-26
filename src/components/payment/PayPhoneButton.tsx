@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { PAYPHONE_CONFIG } from '@/config/payment';
 
 interface PayPhoneButtonProps {
   planId: string;
@@ -43,18 +42,28 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
         throw new Error(`Error al registrar la compra: ${purchaseError.message}`);
       }
 
-      // Call Supabase Edge Function to create payment
-      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payphone-payment', {
-        body: {
+      // Call PayPhone API directly
+      const response = await fetch(import.meta.env.VITE_PAYPHONE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_PAYPHONE_API_KEY}`
+        },
+        body: JSON.stringify({
           amount: amount * 100, // Convert to cents
-          purchaseId: purchase.id,
-          planTitle,
-          email
-        }
+          clientTransactionId: purchase.id,
+          responseUrl: `${import.meta.env.VITE_PAYPHONE_CLIENT_URL}/payment-success`,
+          cancellationUrl: `${import.meta.env.VITE_PAYPHONE_CLIENT_URL}/payment-cancelled`,
+          storeId: import.meta.env.VITE_PAYPHONE_STORE_ID,
+          reference: `Plan ${planTitle}`,
+          email: email
+        })
       });
 
-      if (paymentError) {
-        throw new Error(`Error al procesar el pago: ${paymentError.message}`);
+      const paymentData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(`Error de PayPhone: ${paymentData.message || 'Error desconocido'}`);
       }
 
       // Open the PayPhone payment window
