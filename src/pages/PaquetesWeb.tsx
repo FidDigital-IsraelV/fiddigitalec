@@ -95,6 +95,7 @@ const PaquetesWeb: React.FC = () => {
       toast.success('¡Pago completado con éxito!');
       setSelectedPlan(null);
       setEmail('');
+      setRequirements('');
     } catch (error) {
       console.error('Error al procesar el pago exitoso:', error);
       toast.error('Error al procesar el pago');
@@ -115,9 +116,6 @@ const PaquetesWeb: React.FC = () => {
       if (!email.includes('@')) {
         throw new Error('Por favor, ingrese un correo electrónico válido');
       }
-
-      // El registro de compra ahora se maneja en el PayPhoneButton
-      setSelectedPlan(selectedPlan);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Error al procesar el pago');
       toast.error('Error al procesar el pago');
@@ -127,7 +125,7 @@ const PaquetesWeb: React.FC = () => {
   };
 
   // Show loading state
-  if (isLoading) {
+  if (plansLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-fidblue"></div>
@@ -137,7 +135,7 @@ const PaquetesWeb: React.FC = () => {
   }
 
   // Show error state
-  if (error) {
+  if (plansError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <div className="text-red-500 mb-4">
@@ -165,111 +163,153 @@ const PaquetesWeb: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-16">
-      <div className="text-center mb-16">
-        <h1 className="text-4xl font-bold mb-4">Paquetes Web</h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Seleccione el paquete que mejor se adapte a sus necesidades
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Paquetes Web
+          </h1>
+          <p className="text-xl text-gray-600 mb-8">
+            Soluciones web profesionales adaptadas a tus necesidades
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 max-w-5xl mx-auto">
-        {plans.map((plan) => (
-          <motion.div
-            key={plan.id}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            viewport={{ once: true }}
-          >
-            <Card className="overflow-hidden border-gradient h-full flex flex-col">
-              <CardHeader className="text-center pb-2">
-                <CardTitle className="text-3xl text-indigo-800 font-bold">
+        {/* Planes Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+          {plans.map((plan) => (
+            <div
+              key={plan.id}
+              className={`bg-white rounded-lg shadow-lg overflow-hidden border-2 transition-all duration-300 ${
+                selectedPlan?.id === plan.id
+                  ? 'border-indigo-600 shadow-indigo-100'
+                  : 'border-gray-200 hover:border-indigo-300'
+              }`}
+            >
+              <div className="p-6">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
                   {plan.title}
-                </CardTitle>
-                <p className="text-sm text-gray-500">{plan.description}</p>
-              </CardHeader>
-              
-              <CardContent className="pt-4 flex-grow">
-                <div className="text-center mb-6">
-                  <div className="flex items-center justify-center">
-                    <span className="text-sm text-gray-500 mr-1">a solo</span>
-                    <span className="text-6xl font-bold text-indigo-900">${plan.price}</span>
-                  </div>
-                </div>
-                
-                <Button 
-                  className="w-full bg-indigo-800 hover:bg-indigo-700 mb-6"
-                  onClick={() => handleSelectPlan(plan)}
-                >
-                  Empieza ahora
-                </Button>
-                
-                <ul className="space-y-3">
+                </h3>
+                <p className="text-4xl font-bold text-indigo-600 mb-4">
+                  ${plan.price}
+                  <span className="text-base font-normal text-gray-500">
+                    /mes
+                  </span>
+                </p>
+                <p className="text-gray-600 mb-6">{plan.description}</p>
+                <ul className="space-y-3 mb-6">
                   {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start">
-                      <div className="mr-2 mt-1 flex-shrink-0">
-                        <Check className="h-5 w-5 text-pink-500" />
-                      </div>
+                    <li key={index} className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
                       <span className="text-gray-700">{feature}</span>
                     </li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {selectedPlan && (
-        <div id="checkout-form" className="max-w-2xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
-          <div className="bg-indigo-800 text-white p-6">
-            <h2 className="text-2xl font-bold">Complete su compra</h2>
-            <p className="text-lg">{selectedPlan.title} - ${selectedPlan.price.toFixed(2)}</p>
-          </div>
-          
-          <div className="p-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Su correo electrónico"
-                required
-              />
+                <Button
+                  onClick={() => setSelectedPlan(plan)}
+                  className={`w-full ${
+                    selectedPlan?.id === plan.id
+                      ? 'bg-indigo-700 hover:bg-indigo-600'
+                      : 'bg-indigo-600 hover:bg-indigo-500'
+                  }`}
+                >
+                  {selectedPlan?.id === plan.id ? 'Plan Seleccionado' : 'Seleccionar Plan'}
+                </Button>
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="requirements">Requerimientos específicos</Label>
-              <Textarea
-                id="requirements"
-                value={requirements}
-                onChange={(e) => setRequirements(e.target.value)}
-                placeholder="Describa sus necesidades específicas para este servicio"
-                rows={5}
-              />
-            </div>
-
-            <div className="flex flex-col gap-3 pt-4">
-              <PayPhoneButton
-                planId={selectedPlan.id}
-                planTitle={selectedPlan.title}
-                amount={selectedPlan.price}
-                email={email}
-                className="w-full bg-indigo-800 hover:bg-indigo-700"
-                onSuccess={handlePaymentSuccess}
-                onStart={handlePaymentStart}
-              />
-              
-              <p className="text-sm text-gray-500 text-center">
-                Al hacer clic en "Pagar" acepta nuestros términos y condiciones
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+
+        {/* Formulario de Pago */}
+        {selectedPlan && (
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              Completar Compra
+            </h2>
+            <div className="space-y-6">
+              <div>
+                <Label htmlFor="email">Correo Electrónico</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="requirements">Requisitos Específicos</Label>
+                <Textarea
+                  id="requirements"
+                  value={requirements}
+                  onChange={(e) => setRequirements(e.target.value)}
+                  placeholder="Describe cualquier requisito específico para tu sitio web..."
+                  className="mt-1"
+                  rows={4}
+                />
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-gray-900 mb-2">
+                  Resumen de Compra
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Plan Seleccionado:</span>
+                    <span className="font-medium">{selectedPlan.title}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Precio:</span>
+                    <span className="font-medium">${selectedPlan.price}/mes</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">IVA (12%):</span>
+                    <span className="font-medium">
+                      ${(selectedPlan.price * 0.12).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-indigo-600">
+                    <span>Total:</span>
+                    <span>
+                      ${(selectedPlan.price * 1.12).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedPlan(null);
+                    setEmail('');
+                    setRequirements('');
+                    setError(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <PayPhoneButton
+                  planId={selectedPlan.id}
+                  planTitle={selectedPlan.title}
+                  amount={selectedPlan.price}
+                  email={email}
+                  className="w-full bg-indigo-800 hover:bg-indigo-700"
+                  onSuccess={handlePaymentSuccess}
+                  onStart={handlePaymentStart}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

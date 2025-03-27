@@ -25,10 +25,23 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
   amount,
   email,
   onSuccess,
-  onStart
+  onStart,
+  className
 }) => {
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+
+  useEffect(() => {
+    if (buttonRef.current) {
+      initializePayPhone();
+    }
+
+    return () => {
+      if (window.ppb) {
+        // Cleanup if needed
+      }
+    };
+  }, [planId, planTitle, amount, email]);
 
   const initializePayPhone = async () => {
     try {
@@ -140,7 +153,7 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
 
   return (
     <div>
-      <div id="pp-button" ref={buttonRef} />
+      <div id="pp-button" ref={buttonRef} className={className} />
       {isLoading && (
         <div className="mt-2 text-sm text-gray-500">
           Inicializando pago...
