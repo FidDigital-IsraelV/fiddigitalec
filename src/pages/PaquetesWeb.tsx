@@ -13,14 +13,16 @@ import PayPhoneButton from '@/components/payment/PayPhoneButton';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 
-const PaquetesWeb = () => {
+const PaquetesWeb: React.FC = () => {
   const { user } = useAuth();
   const [email, setEmail] = useState(user?.email || '');
   const [selectedPlan, setSelectedPlan] = useState<PaymentPlan | null>(null);
   const [requirements, setRequirements] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch payment plans with error handling
-  const { data: plans, isLoading, error } = useQuery({
+  const { data: plans, isLoading: plansLoading, error: plansError } = useQuery({
     queryKey: ['payment-plans-web'],
     queryFn: async () => {
       try {
@@ -84,6 +86,43 @@ const PaquetesWeb = () => {
     } catch (error) {
       console.error('Error in handleSubmitRequirements:', error);
       toast.error('Error al guardar los requerimientos');
+    }
+  };
+
+  const handlePaymentSuccess = async (transactionId: string) => {
+    try {
+      // Aquí puedes agregar cualquier lógica adicional después del pago exitoso
+      toast.success('¡Pago completado con éxito!');
+      setSelectedPlan(null);
+      setEmail('');
+    } catch (error) {
+      console.error('Error al procesar el pago exitoso:', error);
+      toast.error('Error al procesar el pago');
+    }
+  };
+
+  const handlePaymentStart = async () => {
+    if (!selectedPlan || !email) {
+      toast.error('Por favor, seleccione un plan y complete su correo electrónico');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Validar el correo electrónico
+      if (!email.includes('@')) {
+        throw new Error('Por favor, ingrese un correo electrónico válido');
+      }
+
+      // El registro de compra ahora se maneja en el PayPhoneButton
+      setSelectedPlan(selectedPlan);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Error al procesar el pago');
+      toast.error('Error al procesar el pago');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -220,7 +259,8 @@ const PaquetesWeb = () => {
                 amount={selectedPlan.price}
                 email={email}
                 className="w-full bg-indigo-800 hover:bg-indigo-700"
-                onSuccess={() => handleSubmitRequirements()}
+                onSuccess={handlePaymentSuccess}
+                onStart={handlePaymentStart}
               />
               
               <p className="text-sm text-gray-500 text-center">
