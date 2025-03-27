@@ -30,6 +30,19 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
   useEffect(() => {
     const initializePayPhone = async () => {
       try {
+        // Validate environment variables
+        const apiKey = import.meta.env.VITE_PAYPHONE_API_KEY;
+        const storeId = import.meta.env.VITE_PAYPHONE_STORE_ID;
+
+        if (!apiKey || !storeId) {
+          throw new Error('Faltan credenciales de PayPhone. Verifique las variables de entorno.');
+        }
+
+        console.log('PayPhone Credentials:', {
+          storeId,
+          apiKeyLength: apiKey.length
+        });
+
         // First, create a record of the purchase attempt
         const { data: purchase, error: purchaseError } = await supabase
           .from('purchases')
@@ -48,12 +61,12 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
 
         // Convert amount to cents and calculate tax (12% IVA in Ecuador)
         const amountInCents = Math.round(amount * 100);
-        const baseAmount = Math.round(amountInCents / 1.15); // Remove tax from total
+        const baseAmount = Math.round(amountInCents / 1.12); // Remove tax from total
         const taxAmount = amountInCents - baseAmount; // Calculate tax amount
 
         // Initialize PayPhone Button Box
-        window.ppb = new window.PPaymentButtonBox({
-          token: import.meta.env.VITE_PAYPHONE_API_KEY,
+        const payPhoneConfig = {
+          token: apiKey,
           clientTransactionId: purchase.id,
           amount: amountInCents, // Total amount in cents
           amountWithTax: baseAmount, // Base amount that will be taxed
@@ -62,13 +75,17 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
           service: 0,
           tip: 0,
           currency: "USD",
-          storeId: import.meta.env.VITE_PAYPHONE_STORE_ID,
+          storeId: storeId,
           reference: `Plan ${planTitle}`,
           email: email,
           lang: "es",
           defaultMethod: "card",
           timeZone: -5
-        }).render('pp-button');
+        };
+
+        console.log('PayPhone Configuration:', payPhoneConfig);
+
+        window.ppb = new window.PPaymentButtonBox(payPhoneConfig).render('pp-button');
 
         // Listen for payment success
         window.addEventListener('message', (event) => {
@@ -78,14 +95,6 @@ const PayPhoneButton: React.FC<PayPhoneButtonProps> = ({
               onSuccess(event.data.transactionId);
             }
           }
-        });
-
-        // Log the configuration for debugging
-        console.log('PayPhone Configuration:', {
-          amount: amountInCents,
-          amountWithTax: baseAmount,
-          tax: taxAmount,
-          total: baseAmount + taxAmount
         });
 
       } catch (error) {
